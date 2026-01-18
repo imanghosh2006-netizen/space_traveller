@@ -6,8 +6,7 @@ A high-speed, aesthetic noir survival game built with **Python (PyScript)** and 
 ![Built With](https://img.shields.io/badge/BUILT%20WITH-PYSCRIPT-ff2d95?style=for-the-badge)
 
 ## 🚀 Live Demo
-**[PLAY THE GAME HERE](https://your-username.github.io/neon-dodger/)**
-*(Replace the link above with your actual GitHub Pages URL)*
+**[PLAY THE GAME HERE][(https://imanghosh2006-netizen.github.io/space_traveller/)]**
 
 ---
 

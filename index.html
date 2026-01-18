@@ -250,8 +250,8 @@
             ctx.shadowBlur = 10; ctx.shadowColor = "#00f2ff"
             ctx.fillStyle = "#fff"; ctx.fillRect(player["x"], player["y"], 30, 30)
 
-            # Faster Initial Speed (5.0 instead of 3.2)
-            fall_speed = 5.0 + (level * 0.5)
+            # Initial Speed (3.9) and Spawn Rate (0.02)
+            fall_speed = 3.9 + (level * 0.5)
             spawn_rate = 0.02 + (level * 0.001)
 
             if random.random() < spawn_rate:

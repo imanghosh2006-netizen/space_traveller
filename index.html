@@ -78,7 +78,9 @@
             z-index: 30; pointer-events: auto;
         }
 
-        button:active { background: var(--neon-pink); color: #fff; transform: scale(0.95); }
+        button:disabled { border-color: #555; color: #555; cursor: wait; box-shadow: none; }
+
+        button:active:not(:disabled) { background: var(--neon-pink); color: #fff; transform: scale(0.95); }
 
         #progress-bar { width: 100%; max-width: 400px; height: 4px; background: #111; margin-top: 10px; }
         #progress-fill { width: 0%; height: 100%; background: var(--neon-pink); transition: width 0.1s; }
@@ -107,10 +109,10 @@
                     <div id="start-screen" class="overlay">
                         <h1 style="color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); margin: 0; font-size: 1.8rem;">GALACTIC DODGER</h1>
                         <div style="font-size: 0.65rem; color: #888; margin: 15px 0; text-align: left; line-height: 1.6;">
-                            <span style="color: var(--neon-blue)">> STATUS:</span> ENGINES PRIMED<br>
+                            <span style="color: var(--neon-blue)">> STATUS:</span> <span id="sys-status">LOADING ENGINE...</span><br>
                             <span style="color: var(--neon-blue)">> HIGH SCORE:</span> <span id="high-score-display" style="color: #fff">0000</span><br>
                         </div>
-                        <button id="btn-engage">ENGAGE</button>
+                        <button id="btn-engage" disabled>WAITING...</button>
                     </div>
 
                     <div id="break-screen" class="overlay hidden">
@@ -138,7 +140,8 @@
 
     <div class="bottom-terminal">
         <div>SYS_TIME: <span id="clock">00:00:00</span></div>
-        <div style="color: #0f0;">STABILITY: <span id="stability">100</span>%</div>
+        <div style="color: #0f0;">MISSION_CLOCK: <span id="mission-timer">00:00</span></div>
+        <div style="color: var(--neon-pink);">STABILITY: <span id="stability">100</span>%</div>
     </div>
 
     <script type="py">
@@ -158,9 +161,8 @@
         stars = [{"x": random.random()*400, "y": random.random()*500, "s": random.random()*2} for _ in range(60)]
         
         score, level = 0, 1
-        game_active, in_break = False, False
+        game_active, in_break, mission_start_time = False, False, None
 
-        # --- SCOREBOARD LOGIC ---
         def get_high_score():
             hs = js.localStorage.getItem("galactic_dodger_highscore")
             return int(hs) if hs else 0
@@ -168,15 +170,12 @@
         def save_high_score(new_score):
             if new_score > get_high_score():
                 js.localStorage.setItem("galactic_dodger_highscore", str(new_score))
-                return True
-            return False
+                update_score_displays()
 
         def update_score_displays():
             hs = get_high_score()
             js.document.getElementById("high-score-display").innerText = str(hs)
             js.document.getElementById("high-score-list").innerText = f"RECORD: {hs}"
-
-        update_score_displays()
 
         def log_term(side, msg):
             panel = js.document.getElementById(f"term-{side}")
@@ -204,10 +203,11 @@
         game_canvas.addEventListener("touchend", create_proxy(lambda e: keys.update({"ArrowLeft":False, "ArrowRight":False})))
 
         def startGame(e):
-            global game_active, score, level, enemies
+            global game_active, mission_start_time, enemies, score, level
             js.document.getElementById("start-screen").classList.add("hidden")
             js.document.getElementById("end-screen").classList.add("hidden")
             game_active = True
+            mission_start_time = datetime.now()
             log_term("left", "CORE_REBOOT_SUCCESS")
 
         def continueGame(e):
@@ -220,6 +220,7 @@
         btn_respawn = js.document.getElementById("btn-respawn")
         
         btn_engage.addEventListener("click", create_proxy(startGame))
+        btn_engage.addEventListener("touchstart", create_proxy(startGame))
         btn_next.addEventListener("click", create_proxy(continueGame))
         btn_respawn.addEventListener("click", create_proxy(lambda e: js.location.reload()))
 
@@ -235,24 +236,28 @@
         def update(timestamp):
             global score, level, game_active, in_break
             draw_bg()
-            js.document.getElementById("clock").innerText = datetime.now().strftime("%H:%M:%S")
+            
+            # Clock & Mission Timer
+            now = datetime.now()
+            js.document.getElementById("clock").innerText = now.strftime("%H:%M:%S")
+            if game_active and mission_start_time:
+                delta = now - mission_start_time
+                mins, secs = divmod(delta.seconds, 60)
+                js.document.getElementById("mission-timer").innerText = f"{mins:02}:{secs:02}"
             
             if not game_active or in_break:
                 js.requestAnimationFrame(create_proxy(update))
                 return
 
             ctx.clearRect(0, 0, 400, 500)
-            
-            # Increased Player Speed (12 instead of 8)
             if keys["ArrowLeft"] and player["x"] > 0: player["x"] -= 12
             if keys["ArrowRight"] and player["x"] < 370: player["x"] += 12
             
             ctx.shadowBlur = 10; ctx.shadowColor = "#00f2ff"
             ctx.fillStyle = "#fff"; ctx.fillRect(player["x"], player["y"], 30, 30)
 
-            # Initial Speed (3.9) and Spawn Rate (0.02)
-            fall_speed = 3.9 + (level * 0.5)
-            spawn_rate = 0.02 + (level * 0.001)
+            fall_speed = 4.5 + (level * 0.6) # Faster initial speed
+            spawn_rate = 0.025 + (level * 0.001)
 
             if random.random() < spawn_rate:
                 enemies.append({"x": random.randint(0,370), "y": -30})
@@ -262,11 +267,9 @@
                 ctx.shadowBlur = 8; ctx.shadowColor = "#ff2d95"
                 ctx.fillStyle = "#ff2d95"; ctx.fillRect(e["x"], e["y"], 25, 25)
 
-                # Collision
                 if (player["x"] < e["x"]+25 and player["x"]+30 > e["x"] and player["y"] < e["y"]+25 and player["y"]+30 > e["y"]):
                     game_active = False
                     save_high_score(score)
-                    update_score_displays()
                     js.document.getElementById("final-score").innerText = str(score)
                     js.document.getElementById("end-screen").classList.remove("hidden")
 
@@ -281,10 +284,14 @@
                         in_break = True
                         js.document.getElementById("level-val").innerText = str(level)
                         js.document.getElementById("break-screen").classList.remove("hidden")
-                        log_term("left", f"WARP_TO_SEC_{level}")
 
             js.requestAnimationFrame(create_proxy(update))
 
+        # Final Boot
+        update_score_displays()
+        btn_engage.disabled = False
+        btn_engage.innerText = "ENGAGE"
+        js.document.getElementById("sys-status").innerText = "ENGINES PRIMED"
         update(0)
     </script>
 </body>

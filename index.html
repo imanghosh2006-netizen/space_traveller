@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Dodger: Galactic Terminal</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    
+    <style>
+        :root { 
+            --neon-pink: #ff2d95; 
+            --neon-blue: #00f2ff; 
+            --deep-purple: #2d004d;
+        }
+
+        body {
+            background-color: #010101;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; font-family: 'Courier New', Courier, monospace;
+            color: var(--neon-blue); overflow-x: hidden;
+        }
+
+        body::after {
+            content: " ";
+            position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
+            z-index: 100; background-size: 100% 2px, 3px 100%; pointer-events: none;
+        }
+
+        #main-container {
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 15px; padding: 10px;
+        }
+
+        .terminal-panel {
+            width: 180px; height: 450px; background: rgba(5, 5, 15, 0.85);
+            border: 1px solid #222; padding: 12px; font-size: 0.65rem; color: #0f0;
+            overflow: hidden; display: flex; flex-direction: column; gap: 4px;
+            box-shadow: 0 0 15px rgba(0,0,0,1);
+        }
+
+        .bottom-terminal {
+            width: 100%; max-width: 800px; height: 60px; background: rgba(5, 5, 10, 0.9);
+            border: 1px solid #222; margin-top: 15px; padding: 10px; font-size: 0.7rem;
+            display: flex; justify-content: space-around; align-items: center; color: #ffff00;
+        }
+
+        #game-wrapper {
+            position: relative; width: 90vw; max-width: 400px; aspect-ratio: 4 / 5;
+            padding: 5px; border-radius: 15px;
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-blue));
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.2);
+        }
+
+        #canvas-container {
+            position: relative; width: 100%; height: 100%;
+            border-radius: 12px; overflow: hidden; background: #000;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 0, 15, 0.96); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 10; padding: 25px;
+            text-align: center;
+        }
+
+        .hidden { display: none; }
+
+        button {
+            background: transparent; border: 1px solid var(--neon-pink); color: var(--neon-pink);
+            padding: 12px 35px; cursor: pointer; text-transform: uppercase; 
+            font-weight: bold; letter-spacing: 4px; transition: 0.3s;
+            box-shadow: 0 0 8px var(--neon-pink); margin-top: 15px;
+        }
+
+        button:hover { background: var(--neon-pink); color: #fff; box-shadow: 0 0 20px var(--neon-pink); }
+
+        #progress-bar { width: 100%; max-width: 400px; height: 4px; background: #111; margin-top: 10px; }
+        #progress-fill { width: 0%; height: 100%; background: var(--neon-pink); transition: width 0.2s; }
+
+        @media (max-width: 800px) { .terminal-panel { display: none; } }
+    </style>
+</head>
+<body>
+
+    <div id="main-container">
+        <div class="terminal-panel" id="term-left">
+            <div style="color: var(--neon-pink)">[MISSION_LOG]</div>
+        </div>
+
+        <div id="game-side">
+            <div style="margin-bottom: 8px; letter-spacing: 2px; font-size: 0.8rem; font-weight: bold; display: flex; justify-content: space-between;">
+                <span>SECTOR <span id="level-val">1</span>/100</span> 
+                <span>DATA <span id="score-val">0</span></span>
+            </div>
+
+            <div id="game-wrapper">
+                <div id="canvas-container">
+                    <canvas id="bgCanvas" width="400" height="500"></canvas>
+                    <canvas id="gameCanvas" width="400" height="500"></canvas>
+
+                    <div id="start-screen" class="overlay">
+                        <h1 style="color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink); margin: 0; font-size: 1.8rem;">GALACTIC DODGER</h1>
+                        <div style="font-size: 0.6rem; color: #888; margin: 15px 0; text-align: left; line-height: 1.6;">
+                            <span style="color: var(--neon-blue)">> NAVIGATION:</span> DODGE VOID BLOCKS<br>
+                            <span style="color: var(--neon-blue)">> CONTROLS:</span> ARROW KEYS / SCREEN SIDES<br>
+                            <span style="color: var(--neon-blue)">> SHIP:</span> NEON-INTERCEPTOR CLS-IV<br>
+                            <span style="color: #0f0">> STATUS:</span> ENGINES AT 3.2 AU/S
+                        </div>
+                        <button onclick="startGame()">ENGAGE</button>
+                    </div>
+
+                    <div id="break-screen" class="overlay hidden">
+                        <h2 style="color: var(--neon-blue);">SECTOR CLEARED</h2>
+                        <button onclick="continueGame()">NEXT SECTOR</button>
+                    </div>
+
+                    <div id="end-screen" class="overlay hidden">
+                        <h1 style="color: red;">HULL BREACH</h1>
+                        <button onclick="location.reload()">RESPAWN</button>
+                    </div>
+                </div>
+            </div>
+            <div id="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+
+        <div class="terminal-panel" id="term-right">
+            <div style="color: var(--neon-blue)">[NAV_COMP]</div>
+        </div>
+    </div>
+
+    <div class="bottom-terminal">
+        <div>SYS_TIME: <span id="clock">00:00:00</span></div>
+        <div style="color: #0f0;">MISSION_CLOCK: <span id="mission-timer">00:00</span></div>
+        <div style="color: var(--neon-pink);">STABILITY: 100%</div>
+    </div>
+
+    <script type="py">
+        import js
+        from pyodide.ffi import create_proxy
+        import random
+        import math
+        from datetime import datetime
+
+        game_canvas = js.document.getElementById("gameCanvas")
+        ctx = game_canvas.getContext("2d")
+        bg_canvas = js.document.getElementById("bgCanvas")
+        bg_ctx = bg_canvas.getContext("2d")
+        
+        player = {"x": 185, "y": 430, "size": 30}
+        enemies = []
+        stars = [{"x": random.random()*400, "y": random.random()*500, "s": random.random()*2, "o": random.random()} for _ in range(80)]
+        
+        score, level = 0, 1
+        game_active, in_break, mission_start_time = False, False, 0
+
+        def log_term(side, msg):
+            panel = js.document.getElementById(f"term-{side}")
+            if not panel: return
+            div = js.document.createElement("div")
+            div.innerText = f"> {msg}"
+            panel.appendChild(div)
+            if panel.children.length > 22: panel.removeChild(panel.children.item(1))
+
+        keys = {"ArrowLeft": False, "ArrowRight": False}
+        def on_key(e, state): 
+            if e.code in keys: keys[e.code] = state
+        js.window.addEventListener("keydown", create_proxy(lambda e: on_key(e, True)))
+        js.window.addEventListener("keyup", create_proxy(lambda e: on_key(e, False)))
+
+        def handle_touch(e):
+            e.preventDefault()
+            tx = (e.touches.item(0).clientX - game_canvas.getBoundingClientRect().left) * (400/game_canvas.getBoundingClientRect().width)
+            if tx < 200: keys["ArrowLeft"] = True; keys["ArrowRight"] = False
+            else: keys["ArrowRight"] = True; keys["ArrowLeft"] = False
+        game_canvas.addEventListener("touchstart", create_proxy(handle_touch))
+        game_canvas.addEventListener("touchend", create_proxy(lambda e: keys.update({"ArrowLeft":False, "ArrowRight":False})))
+
+        def startGame(e=None):
+            js.document.getElementById("start-screen").classList.add("hidden")
+            global game_active, mission_start_time
+            game_active = True
+            mission_start_time = datetime.now()
+            log_term("left", "WARP_DRIVE_ACTIVE")
+            log_term("right", "THRUSTERS_STABLE")
+        js.window.startGame = create_proxy(startGame)
+
+        def continueGame(e=None):
+            js.document.getElementById("break-screen").classList.add("hidden")
+            global game_active, in_break, enemies; game_active, in_break, enemies = True, False, []
+            log_term("left", f"ENTERING_SECTOR_{level}")
+        js.window.continueGame = create_proxy(continueGame)
+
+        def draw_galactic_bg():
+            bg_ctx.fillStyle = "#00050a"
+            bg_ctx.fillRect(0, 0, 400, 500)
+            for s in stars:
+                speed = 0.4 + (level * 0.08)
+                s["y"] += speed * s["s"]
+                if s["y"] > 500: s["y"] = 0; s["x"] = random.random()*400
+                alpha = 0.3 + math.sin(datetime.now().microsecond / 100000.0 + s["o"]*10) * 0.5
+                bg_ctx.fillStyle = f"rgba(255, 255, 255, {alpha})"
+                bg_ctx.fillRect(s["x"], s["y"], s["s"], s["s"])
+            bg_ctx.globalAlpha = 0.1
+            grad = bg_ctx.createRadialGradient(200, 250, 50, 200, 250, 300)
+            grad.addColorStop(0, "#2d004d")
+            grad.addColorStop(1, "transparent")
+            bg_ctx.fillStyle = grad
+            bg_ctx.fillRect(0, 0, 400, 500)
+            bg_ctx.globalAlpha = 1.0
+
+        def update_clocks():
+            now = datetime.now()
+            js.document.getElementById("clock").innerText = now.strftime("%H:%M:%S")
+            if game_active and mission_start_time:
+                delta = now - mission_start_time
+                mins, secs = divmod(delta.seconds, 60)
+                js.document.getElementById("mission-timer").innerText = f"{mins:02}:{secs:02}"
+
+        def update(timestamp):
+            global score, level, game_active, in_break
+            draw_galactic_bg()
+            update_clocks()
+            if not game_active or in_break:
+                js.requestAnimationFrame(create_proxy(update)); return
+
+            ctx.clearRect(0, 0, 400, 500)
+            js.document.getElementById("progress-fill").style.width = f"{(score % 100)}%"
+
+            if keys["ArrowLeft"] and player["x"] > 0: player["x"] -= 8
+            if keys["ArrowRight"] and player["x"] < 370: player["x"] += 8
+            
+            ctx.shadowBlur = 15; ctx.shadowColor = "#00f2ff"
+            ctx.fillStyle = "#fff"; ctx.fillRect(player["x"], player["y"], 30, 30)
+
+            # --- ADJUSTED SPEED PARAMETERS ---
+            spawn_rate = 0.018 + (level * 0.0006)
+            fall_speed = 3.2 + (level * 0.08)
+
+            if random.random() < spawn_rate:
+                e_type = "normal"
+                if level >= 10 and random.random() > 0.8: e_type = "seeker"
+                enemies.append({"x": random.randint(0,370), "y": -30, "type": e_type})
+                if random.random() > 0.97: log_term("right", f"DETECTOR_{e_type.upper()}")
+
+            for e in enemies[:]:
+                e["y"] += fall_speed
+                if e["type"] == "seeker" and e["y"] < 320:
+                    e["x"] += 1.5 if e["x"] < player["x"] else -1.5
+
+                ctx.shadowBlur = 10; ctx.shadowColor = "#ff2d95"
+                ctx.fillStyle = "rgba(255, 45, 149, 0.9)"; ctx.fillRect(e["x"], e["y"], 25, 25)
+
+                if (player["x"] < e["x"]+25 and player["x"]+30 > e["x"] and player["y"] < e["y"]+25 and player["y"]+30 > e["y"]):
+                    game_active = False; js.document.getElementById("end-screen").classList.remove("hidden")
+                    log_term("left", "IMPACT_DETECTED")
+
+                if e["y"] > 500:
+                    enemies.remove(e); score += 2
+                    js.document.getElementById("score-val").innerText = str(score)
+                    if score // 100 >= level:
+                        level += 1
+                        in_break = True; js.document.getElementById("break-screen").classList.remove("hidden")
+                        js.document.getElementById("level-val").innerText = str(level)
+                        log_term("left", f"WARP_TO_SEC_{level}")
+
+            js.requestAnimationFrame(create_proxy(update))
+
+        update(0)
+    </script>
+</body>
+</html>

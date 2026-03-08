@@ -29,6 +29,8 @@ A high-speed, aesthetic noir survival game built with **Python (PyScript)** and 
 
 ---
 
+Enjoy The Game!
+
 ## 📂 Installation (For Local Development)
 
 If you want to run this project locally on your machine:
